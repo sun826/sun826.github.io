@@ -191,6 +191,15 @@
     pointer-events: none;
   }
 
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20%      { transform: translateX(-5px); }
+    40%      { transform: translateX(5px); }
+    60%      { transform: translateX(-4px); }
+    80%      { transform: translateX(4px); }
+  }
+  .piece.invalid { animation: shake .35s ease; outline: 3px solid #ef4444 !important; }
+
   /* borders that hide when neighbours match */
   .piece { outline: 2px solid rgba(255,255,255,0.25); }
   .piece.selected { outline: 3px solid #f59e0b; z-index: 2; transform: scale(1.04); box-shadow: 0 0 20px rgba(245,158,11,0.5); }
@@ -555,6 +564,14 @@ function renderGrid(pw, ph) {
   applyCorrectStyles();
 }
 
+// ─── Adjacency check ─────────────────────────────────────────
+function isAdjacent(a, b) {
+  const ar = Math.floor(a / cols), ac = a % cols;
+  const br = Math.floor(b / cols), bc = b % cols;
+  return (ar === br && Math.abs(ac - bc) === 1) ||
+         (ac === bc && Math.abs(ar - br) === 1);
+}
+
 // ─── Click handler ───────────────────────────────────────────
 puzzleGrid.addEventListener('click', e => {
   if (!gameActive) return;
@@ -571,10 +588,21 @@ puzzleGrid.addEventListener('click', e => {
       selectedIdx = null;
       return;
     }
+
+    if (!isAdjacent(selectedIdx, idx)) {
+      // 不相邻：清除所有选中高亮，抖动提示，重新选择
+      puzzleGrid.querySelectorAll('.piece.selected').forEach(p => p.classList.remove('selected'));
+      selectedIdx = null;
+      cell.classList.add('invalid');
+      cell.addEventListener('animationend', () => cell.classList.remove('invalid'), { once: true });
+      return;
+    }
+
     // Swap
     swapPieces(selectedIdx, idx);
     moves++;
     hudMoves.textContent = moves;
+    puzzleGrid.querySelectorAll('.piece.selected').forEach(p => p.classList.remove('selected'));
     selectedIdx = null;
 
     if (checkWin()) {
