@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>拼图游戏</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0f0f1a;
+    color: #e0e0f0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  header {
+    width: 100%;
+    padding: 20px 40px;
+    background: rgba(255,255,255,0.04);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #a78bfa, #60a5fa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .icon { font-size: 26px; }
+
+  .main {
+    width: 100%;
+    max-width: 1100px;
+    padding: 32px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+  }
+
+  /* ── Setup Panel ── */
+  .setup-panel {
+    width: 100%;
+    max-width: 560px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .setup-panel h2 { font-size: 16px; color: #a0a0c0; font-weight: 500; }
+
+  /* Upload */
+  .upload-zone {
+    border: 2px dashed rgba(167,139,250,0.4);
+    border-radius: 14px;
+    padding: 32px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .upload-zone:hover { border-color: #a78bfa; background: rgba(167,139,250,0.06); }
+  .upload-zone.has-image { padding: 0; border-style: solid; border-color: #a78bfa; }
+  .upload-zone input { display: none; }
+  .upload-zone img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 12px;
+    display: block;
+  }
+  .upload-icon { font-size: 40px; margin-bottom: 10px; }
+  .upload-text { color: #8080a0; font-size: 14px; }
+  .upload-hint { color: #5050708; font-size: 12px; margin-top: 6px; color: #6060807; }
+  .upload-overlay {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity .2s;
+    border-radius: 12px;
+    font-size: 14px; color: #fff;
+  }
+  .upload-zone.has-image:hover .upload-overlay { opacity: 1; }
+
+  /* Difficulty */
+  .difficulty-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .diff-btn {
+    flex: 1;
+    min-width: 80px;
+    padding: 10px 6px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.04);
+    color: #c0c0e0;
+    font-size: 13px;
+    cursor: pointer;
+    text-align: center;
+    transition: all .2s;
+  }
+  .diff-btn:hover { border-color: #a78bfa; color: #a78bfa; }
+  .diff-btn.active {
+    border-color: #a78bfa;
+    background: rgba(167,139,250,0.15);
+    color: #a78bfa;
+    font-weight: 600;
+  }
+  .diff-btn .diff-size { font-size: 17px; font-weight: 700; display: block; }
+  .diff-btn .diff-label { font-size: 11px; opacity: .7; display: block; margin-top: 2px; }
+
+  /* Start */
+  .start-btn {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #a78bfa, #60a5fa);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity .2s, transform .1s;
+  }
+  .start-btn:hover { opacity: .9; }
+  .start-btn:active { transform: scale(.98); }
+  .start-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* ── Game Area ── */
+  .game-area { width: 100%; display: none; flex-direction: column; align-items: center; gap: 20px; }
+  .game-area.visible { display: flex; }
+
+  .game-hud {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 14px;
+    padding: 12px 24px;
+  }
+
+  .hud-item { text-align: center; }
+  .hud-label { font-size: 11px; color: #6060a0; text-transform: uppercase; letter-spacing: .5px; }
+  .hud-value { font-size: 22px; font-weight: 700; color: #e0e0ff; margin-top: 2px; }
+  .hud-divider { width: 1px; height: 36px; background: rgba(255,255,255,0.1); }
+
+  .puzzle-wrapper {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+
+  #puzzle-grid {
+    display: grid;
+    gap: 0;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .piece {
+    position: relative;
+    overflow: hidden;
+    transition: transform .15s, box-shadow .15s;
+    cursor: pointer;
+  }
+
+  .piece img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  /* borders that hide when neighbours match */
+  .piece { outline: 2px solid rgba(255,255,255,0.25); }
+  .piece.selected { outline: 3px solid #f59e0b; z-index: 2; transform: scale(1.04); box-shadow: 0 0 20px rgba(245,158,11,0.5); }
+  .piece.correct { outline: none; }
+
+  /* seam suppression between correct adjacent pieces */
+  .piece.correct.border-right  { margin-right: -1px; }
+  .piece.correct.border-bottom { margin-bottom: -1px; }
+
+  .game-actions {
+    display: flex;
+    gap: 12px;
+  }
+
+  .action-btn {
+    padding: 10px 22px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.06);
+    color: #c0c0e0;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .action-btn:hover { border-color: #a78bfa; color: #a78bfa; }
+
+  /* ── Completion Overlay ── */
+  .overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(6px);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .overlay.visible { display: flex; }
+
+  .completion-card {
+    background: #1a1a2e;
+    border: 1px solid rgba(167,139,250,0.3);
+    border-radius: 24px;
+    padding: 36px;
+    max-width: 420px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+    animation: popIn .35s cubic-bezier(.34,1.56,.64,1);
+  }
+
+  @keyframes popIn {
+    from { opacity: 0; transform: scale(.8); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  .card-emoji { font-size: 52px; margin-bottom: 12px; }
+  .card-title { font-size: 26px; font-weight: 800; background: linear-gradient(135deg,#a78bfa,#60a5fa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .card-subtitle { color: #8080a0; font-size: 14px; margin-top: 6px; }
+
+  .card-stats {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    margin: 24px 0;
+  }
+  .stat { text-align: center; }
+  .stat-val { font-size: 22px; font-weight: 700; color: #e0e0ff; }
+  .stat-lbl { font-size: 11px; color: #6060a0; margin-top: 3px; text-transform: uppercase; }
+
+  .card-image {
+    width: 100%;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+  .card-image img { width: 100%; display: block; }
+
+  .card-buttons { display: flex; gap: 12px; }
+
+  .btn-share {
+    flex: 1;
+    padding: 13px;
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(135deg,#a78bfa,#60a5fa);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity .2s;
+  }
+  .btn-share:hover { opacity: .9; }
+
+  .btn-replay {
+    flex: 1;
+    padding: 13px;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 12px;
+    background: transparent;
+    color: #c0c0e0;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .btn-replay:hover { border-color: #a78bfa; color: #a78bfa; }
+
+  /* share download toast */
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #2a2a4a;
+    border: 1px solid rgba(167,139,250,0.4);
+    border-radius: 12px;
+    padding: 12px 24px;
+    font-size: 14px;
+    color: #c0c0ff;
+    transition: transform .3s;
+    z-index: 200;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* confetti canvas */
+  #confetti-canvas {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 99;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="icon">🧩</span>
+  <h1>拼图游戏</h1>
+</header>
+
+<div class="main">
+
+  <!-- Setup -->
+  <div class="setup-panel" id="setup-panel">
+    <h2>上传图片</h2>
+    <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+      <input type="file" id="file-input" accept="image/*">
+      <div id="upload-placeholder">
+        <div class="upload-icon">🖼️</div>
+        <div class="upload-text">点击上传图片</div>
+        <div class="upload-hint" style="color:#5050a0;font-size:12px;margin-top:6px;">支持 JPG、PNG、GIF 等格式</div>
+      </div>
+      <img id="preview-img" style="display:none">
+      <div class="upload-overlay">更换图片</div>
+    </div>
+
+    <h2>选择难度</h2>
+    <div class="difficulty-row" id="difficulty-row">
+      <button class="diff-btn" data-cols="3" data-rows="3"><span class="diff-size">3×3</span><span class="diff-label">简单</span></button>
+      <button class="diff-btn active" data-cols="4" data-rows="3"><span class="diff-size">4×3</span><span class="diff-label">普通</span></button>
+      <button class="diff-btn" data-cols="4" data-rows="4"><span class="diff-size">4×4</span><span class="diff-label">中等</span></button>
+      <button class="diff-btn" data-cols="5" data-rows="4"><span class="diff-size">5×4</span><span class="diff-label">困难</span></button>
+      <button class="diff-btn" data-cols="5" data-rows="5"><span class="diff-size">5×5</span><span class="diff-label">专家</span></button>
+      <button class="diff-btn" data-cols="6" data-rows="6"><span class="diff-size">6×6</span><span class="diff-label">大师</span></button>
+    </div>
+
+    <button class="start-btn" id="start-btn" disabled>开始游戏</button>
+  </div>
+
+  <!-- Game -->
+  <div class="game-area" id="game-area">
+    <div class="game-hud">
+      <div class="hud-item">
+        <div class="hud-label">难度</div>
+        <div class="hud-value" id="hud-diff">—</div>
+      </div>
+      <div class="hud-divider"></div>
+      <div class="hud-item">
+        <div class="hud-label">时间</div>
+        <div class="hud-value" id="hud-timer">00:00</div>
+      </div>
+      <div class="hud-divider"></div>
+      <div class="hud-item">
+        <div class="hud-label">步数</div>
+        <div class="hud-value" id="hud-moves">0</div>
+      </div>
+    </div>
+
+    <div class="puzzle-wrapper">
+      <div id="puzzle-grid"></div>
+    </div>
+
+    <div class="game-actions">
+      <button class="action-btn" id="btn-restart">🔄 重新打乱</button>
+      <button class="action-btn" id="btn-back">← 重新设置</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Completion overlay -->
+<div class="overlay" id="completion-overlay">
+  <div class="completion-card" id="completion-card">
+    <div class="card-emoji">🎉</div>
+    <div class="card-title">拼图完成！</div>
+    <div class="card-subtitle">太厉害了，完美复原！</div>
+    <div class="card-stats">
+      <div class="stat"><div class="stat-val" id="result-diff">—</div><div class="stat-lbl">难度</div></div>
+      <div class="stat"><div class="stat-val" id="result-time">—</div><div class="stat-lbl">用时</div></div>
+      <div class="stat"><div class="stat-val" id="result-moves">—</div><div class="stat-lbl">步数</div></div>
+    </div>
+    <div class="card-image"><img id="result-img" src="" alt="拼图图片"></div>
+    <div class="card-buttons">
+      <button class="btn-share" id="btn-share">📤 分享成绩</button>
+      <button class="btn-replay" id="btn-replay">再来一局</button>
+    </div>
+  </div>
+</div>
+
+<canvas id="confetti-canvas"></canvas>
+<div class="toast" id="toast">✅ 分享卡片已保存到相册</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────
+let srcImage = null;         // HTMLImageElement
+let cols = 4, rows = 3;
+let pieces = [];             // [{correctIdx, currentIdx, canvas}]
+let selectedIdx = null;      // index in DOM order (currentIdx)
+let moves = 0;
+let timerInterval = null;
+let seconds = 0;
+let gameActive = false;
+
+// ─── DOM refs ────────────────────────────────────────────────
+const fileInput   = document.getElementById('file-input');
+const uploadZone  = document.getElementById('upload-zone');
+const previewImg  = document.getElementById('preview-img');
+const placeholder = document.getElementById('upload-placeholder');
+const startBtn    = document.getElementById('start-btn');
+const setupPanel  = document.getElementById('setup-panel');
+const gameArea    = document.getElementById('game-area');
+const puzzleGrid  = document.getElementById('puzzle-grid');
+const hudDiff     = document.getElementById('hud-diff');
+const hudTimer    = document.getElementById('hud-timer');
+const hudMoves    = document.getElementById('hud-moves');
+const overlay     = document.getElementById('completion-overlay');
+const toast       = document.getElementById('toast');
+
+// ─── Upload ──────────────────────────────────────────────────
+fileInput.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    srcImage = img;
+    previewImg.src = url;
+    previewImg.style.display = 'block';
+    placeholder.style.display = 'none';
+    uploadZone.classList.add('has-image');
+    startBtn.disabled = false;
+  };
+  img.src = url;
+});
+
+// ─── Difficulty ──────────────────────────────────────────────
+document.getElementById('difficulty-row').addEventListener('click', e => {
+  const btn = e.target.closest('.diff-btn');
+  if (!btn) return;
+  document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  cols = parseInt(btn.dataset.cols);
+  rows = parseInt(btn.dataset.rows);
+});
+
+// ─── Start ───────────────────────────────────────────────────
+startBtn.addEventListener('click', () => {
+  if (!srcImage) return;
+  setupPanel.style.display = 'none';
+  gameArea.classList.add('visible');
+  initGame();
+});
+
+document.getElementById('btn-back').addEventListener('click', () => {
+  stopTimer();
+  gameArea.classList.remove('visible');
+  setupPanel.style.display = '';
+  puzzleGrid.innerHTML = '';
+});
+
+document.getElementById('btn-restart').addEventListener('click', () => {
+  stopTimer();
+  initGame();
+});
+
+// ─── Init game ───────────────────────────────────────────────
+function initGame() {
+  moves = 0;
+  seconds = 0;
+  selectedIdx = null;
+  gameActive = true;
+  hudMoves.textContent = '0';
+  hudDiff.textContent = `${cols}×${rows}`;
+  updateTimerDisplay();
+
+  // Calculate piece size keeping aspect ratio within max 560px container
+  const maxW = Math.min(window.innerWidth - 40, 560);
+  const maxH = window.innerHeight * 0.65;
+  const imgRatio = srcImage.naturalWidth / srcImage.naturalHeight;
+  let gridW = maxW;
+  let gridH = gridW / imgRatio;
+  if (gridH > maxH) { gridH = maxH; gridW = gridH * imgRatio; }
+  const pw = Math.floor(gridW / cols);
+  const ph = Math.floor(gridH / rows);
+
+  // Slice image into data URLs
+  const dataURLs = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const cv = document.createElement('canvas');
+      cv.width = pw; cv.height = ph;
+      const ctx = cv.getContext('2d');
+      ctx.drawImage(srcImage,
+        c * (srcImage.naturalWidth / cols),
+        r * (srcImage.naturalHeight / rows),
+        srcImage.naturalWidth / cols,
+        srcImage.naturalHeight / rows,
+        0, 0, pw, ph);
+      dataURLs.push(cv.toDataURL());
+    }
+  }
+
+  // Build pieces array with correctIdx
+  pieces = dataURLs.map((url, i) => ({ correctIdx: i, dataURL: url }));
+
+  // Shuffle
+  for (let i = pieces.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
+  }
+
+  renderGrid(pw, ph);
+  startTimer();
+}
+
+// ─── Render grid ─────────────────────────────────────────────
+function renderGrid(pw, ph) {
+  puzzleGrid.innerHTML = '';
+  puzzleGrid.style.gridTemplateColumns = `repeat(${cols}, ${pw}px)`;
+  puzzleGrid.style.gridTemplateRows    = `repeat(${rows}, ${ph}px)`;
+  puzzleGrid.style.width  = `${pw * cols}px`;
+  puzzleGrid.style.height = `${ph * rows}px`;
+
+  pieces.forEach((piece, idx) => {
+    const div = document.createElement('div');
+    div.className = 'piece';
+    div.dataset.idx = idx;
+    const img = document.createElement('img');
+    img.src = piece.dataURL;
+    div.appendChild(img);
+    puzzleGrid.appendChild(div);
+  });
+
+  applyCorrectStyles();
+}
+
+// ─── Click handler ───────────────────────────────────────────
+puzzleGrid.addEventListener('click', e => {
+  if (!gameActive) return;
+  const cell = e.target.closest('.piece');
+  if (!cell) return;
+  const idx = parseInt(cell.dataset.idx);
+
+  if (selectedIdx === null) {
+    selectedIdx = idx;
+    cell.classList.add('selected');
+  } else {
+    if (selectedIdx === idx) {
+      cell.classList.remove('selected');
+      selectedIdx = null;
+      return;
+    }
+    // Swap
+    swapPieces(selectedIdx, idx);
+    moves++;
+    hudMoves.textContent = moves;
+    selectedIdx = null;
+
+    if (checkWin()) {
+      gameActive = false;
+      stopTimer();
+      setTimeout(showCompletion, 400);
+    }
+  }
+});
+
+function swapPieces(a, b) {
+  [pieces[a], pieces[b]] = [pieces[b], pieces[a]];
+
+  // update both cells' image src
+  const cells = puzzleGrid.querySelectorAll('.piece');
+  [a, b].forEach(idx => {
+    const cell = cells[idx];
+    cell.querySelector('img').src = pieces[idx].dataURL;
+  });
+
+  applyCorrectStyles();
+}
+
+// ─── Correct styles ──────────────────────────────────────────
+function applyCorrectStyles() {
+  const cells = puzzleGrid.querySelectorAll('.piece');
+  cells.forEach((cell, idx) => {
+    const row = Math.floor(idx / cols);
+    const col = idx % cols;
+    const isCorrect = pieces[idx].correctIdx === idx;
+
+    cell.classList.toggle('correct', isCorrect);
+
+    // Check right neighbour: if both correct and adjacent correctIdx
+    if (isCorrect && col < cols - 1) {
+      const rightIdx = idx + 1;
+      if (pieces[rightIdx].correctIdx === rightIdx) {
+        cell.classList.add('border-right');
+      } else {
+        cell.classList.remove('border-right');
+      }
+    } else {
+      cell.classList.remove('border-right');
+    }
+
+    // Check bottom neighbour
+    if (isCorrect && row < rows - 1) {
+      const bottomIdx = idx + cols;
+      if (pieces[bottomIdx].correctIdx === bottomIdx) {
+        cell.classList.add('border-bottom');
+      } else {
+        cell.classList.remove('border-bottom');
+      }
+    } else {
+      cell.classList.remove('border-bottom');
+    }
+  });
+}
+
+// ─── Win check ───────────────────────────────────────────────
+function checkWin() {
+  return pieces.every((p, i) => p.correctIdx === i);
+}
+
+// ─── Timer ───────────────────────────────────────────────────
+function startTimer() {
+  stopTimer();
+  timerInterval = setInterval(() => {
+    seconds++;
+    updateTimerDisplay();
+  }, 1000);
+}
+function stopTimer() { clearInterval(timerInterval); timerInterval = null; }
+function updateTimerDisplay() {
+  const m = String(Math.floor(seconds / 60)).padStart(2,'0');
+  const s = String(seconds % 60).padStart(2,'0');
+  hudTimer.textContent = `${m}:${s}`;
+}
+function formatTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  if (m === 0) return `${s}秒`;
+  return `${m}分${String(s).padStart(2,'0')}秒`;
+}
+
+// ─── Completion ──────────────────────────────────────────────
+function showCompletion() {
+  document.getElementById('result-diff').textContent = `${cols}×${rows}`;
+  document.getElementById('result-time').textContent = formatTime(seconds);
+  document.getElementById('result-moves').textContent = `${moves}步`;
+  document.getElementById('result-img').src = srcImage.src;
+  overlay.classList.add('visible');
+  launchConfetti();
+}
+
+document.getElementById('btn-replay').addEventListener('click', () => {
+  overlay.classList.remove('visible');
+  setupPanel.style.display = '';
+  gameArea.classList.remove('visible');
+  puzzleGrid.innerHTML = '';
+});
+
+// ─── Share (canvas render → download) ────────────────────────
+document.getElementById('btn-share').addEventListener('click', async () => {
+  const card = await renderShareCard();
+  const a = document.createElement('a');
+  a.download = `puzzle_${cols}x${rows}_${formatTime(seconds).replace(/\s/g,'')}.png`;
+  a.href = card;
+  a.click();
+  showToast('✅ 分享卡片已下载');
+});
+
+async function renderShareCard() {
+  const W = 600, pad = 40;
+  const imgH = Math.round(W * srcImage.naturalHeight / srcImage.naturalWidth);
+  const H = pad + 50 + 16 + 24 + 20 + 80 + 20 + imgH + pad;
+
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+
+  // Background
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#1a1a2e');
+  bg.addColorStop(1, '#16213e');
+  ctx.fillStyle = bg;
+  ctx.roundRect(0, 0, W, H, 20);
+  ctx.fill();
+
+  // Border glow
+  ctx.strokeStyle = 'rgba(167,139,250,0.4)';
+  ctx.lineWidth = 1.5;
+  ctx.roundRect(1, 1, W-2, H-2, 20);
+  ctx.stroke();
+
+  // Emoji + title
+  ctx.textAlign = 'center';
+  ctx.font = '48px serif';
+  ctx.fillText('🎉', W/2, pad + 46);
+
+  ctx.font = 'bold 28px -apple-system,sans-serif';
+  const grad = ctx.createLinearGradient(W*0.2, 0, W*0.8, 0);
+  grad.addColorStop(0, '#a78bfa');
+  grad.addColorStop(1, '#60a5fa');
+  ctx.fillStyle = grad;
+  ctx.fillText('拼图完成！', W/2, pad + 46 + 40);
+
+  ctx.font = '14px -apple-system,sans-serif';
+  ctx.fillStyle = '#8080a0';
+  ctx.fillText('太厉害了，完美复原！', W/2, pad + 46 + 40 + 26);
+
+  // Stats row
+  const statsY = pad + 46 + 40 + 26 + 30;
+  const statItems = [
+    { lbl: '难度', val: `${cols}×${rows}` },
+    { lbl: '用时', val: formatTime(seconds) },
+    { lbl: '步数', val: `${moves}步` },
+  ];
+  const sw = (W - pad*2) / 3;
+  statItems.forEach((s, i) => {
+    const cx = pad + sw * i + sw/2;
+    ctx.font = 'bold 22px -apple-system,sans-serif';
+    ctx.fillStyle = '#e0e0ff';
+    ctx.textAlign = 'center';
+    ctx.fillText(s.val, cx, statsY + 26);
+    ctx.font = '11px -apple-system,sans-serif';
+    ctx.fillStyle = '#6060a0';
+    ctx.fillText(s.lbl.toUpperCase(), cx, statsY + 46);
+  });
+
+  // Dividers
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1;
+  [1,2].forEach(i => {
+    const x = pad + sw * i;
+    ctx.beginPath(); ctx.moveTo(x, statsY); ctx.lineTo(x, statsY + 54); ctx.stroke();
+  });
+
+  // Image
+  const imgY = statsY + 70;
+  const imgW = W - pad*2;
+  const displayH = Math.round(imgW * srcImage.naturalHeight / srcImage.naturalWidth);
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(pad, imgY, imgW, displayH, 12);
+  ctx.clip();
+  ctx.drawImage(srcImage, pad, imgY, imgW, displayH);
+  ctx.restore();
+
+  // Bottom label
+  ctx.font = '12px -apple-system,sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.textAlign = 'center';
+  ctx.fillText('🧩 拼图游戏', W/2, imgY + displayH + 22);
+
+  return cv.toDataURL('image/png');
+}
+
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// ─── Confetti ────────────────────────────────────────────────
+function launchConfetti() {
+  const cv = document.getElementById('confetti-canvas');
+  cv.width = window.innerWidth;
+  cv.height = window.innerHeight;
+  const ctx = cv.getContext('2d');
+  const particles = Array.from({length: 120}, () => ({
+    x: Math.random() * cv.width,
+    y: -10 - Math.random() * 200,
+    r: 5 + Math.random() * 6,
+    d: 2 + Math.random() * 3,
+    color: ['#a78bfa','#60a5fa','#f59e0b','#34d399','#f87171'][Math.floor(Math.random()*5)],
+    tilt: Math.random() * 10 - 5,
+    tiltSpeed: 0.1 + Math.random() * 0.2,
+    tiltAngle: 0
+  }));
+
+  let frame = 0;
+  function draw() {
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    particles.forEach(p => {
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, p.r, p.r*0.4, p.tiltAngle, 0, Math.PI*2);
+      ctx.fillStyle = p.color;
+      ctx.fill();
+      p.y += p.d;
+      p.x += Math.sin(frame * 0.02 + p.tiltAngle) * 0.8;
+      p.tiltAngle += p.tiltSpeed;
+    });
+    frame++;
+    if (frame < 200) requestAnimationFrame(draw);
+    else ctx.clearRect(0, 0, cv.width, cv.height);
+  }
+  draw();
+}
+
+// polyfill roundRect for older browsers
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+    this.beginPath();
+    this.moveTo(x+r, y);
+    this.lineTo(x+w-r, y);
+    this.quadraticCurveTo(x+w, y, x+w, y+r);
+    this.lineTo(x+w, y+h-r);
+    this.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+    this.lineTo(x+r, y+h);
+    this.quadraticCurveTo(x, y+h, x, y+h-r);
+    this.lineTo(x, y+r);
+    this.quadraticCurveTo(x, y, x+r, y);
+    this.closePath();
+  };
+}
+</script>
+</body>
+</html>
